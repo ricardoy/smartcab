@@ -11,6 +11,15 @@ class QValue(object):
     """The Q-Value"""
 
     def __init__(self, state, actions, epsilon):
+        """Init for Q-Value of a given state and all possible actions.
+
+        Args:
+            state (tuple): composed by attributes `light`, `oncoming`,
+                `right`, `left` and `next_waypoint`.
+            actions (list): list of all possible actions.
+            epsilon (float): e-greedy parameter; each Q-Value keeps its
+                own variable for independent decayments.
+        """
         self.total_occurences = 0
         self.state = state
         self.scores = dict()
@@ -20,18 +29,39 @@ class QValue(object):
             self.scores[a] = 0.
 
     def get_epsilon_and_update(self):
+        """Apply the epsilon decayment.
+
+            Returns:
+                epsilon (float)
+
+        """
         result = self.epsilon
         self.epsilon = self.epsilon * 0.9
         return result
 
     def update(self, action, score):
+        """Update the Q-value
+
+            Args:
+                action (str): an action.
+                score (float): the new Q-value
+        """
         self.total_occurences = self.total_occurences + 1
         self.scores[action] = score
 
     def score(self, action):
+        """Returns:
+                float: the Q-Value for (self.state, action)
+        """
         return self.scores[action]
 
     def max(self):
+        """Find the action `a` that maximize Q(self.state,`a`)
+
+            Returns:
+                max_score (float): the Q-Value
+                max_action (str): the action
+        """
         max_score = None
         max_action = None
         for a in self.actions:
@@ -41,10 +71,12 @@ class QValue(object):
         return (max_score, max_action)
 
     def get_best_action(self):
+        """Returns the action a that maximizes Q(self.state, a)"""
         (score, action) = self.max()
         return action
 
     def get_max_value(self):
+        """Returns max Q(self.state, a), for all a in self.actions"""
         (score, action) = self.max()
         return score
 
@@ -100,6 +132,15 @@ class LearningAgent(Agent):
         self.trial_result_keeper = TrialResultKeeper()
 
     def select_action_greedy_policy(self, q):
+        """Chooses an action using epsilon-greedy policy.
+
+            Args:
+                q (QValue): the object that represents the Q-Value for the state
+                    self.state and all actions in self.actions.
+
+            Returns:
+                (str): the selected action.
+        """
         if (random.uniform(0, 1) < q.get_epsilon_and_update()):
             return (random.choice(self.actions), 'random')
         else:
@@ -107,6 +148,13 @@ class LearningAgent(Agent):
             return (action, 'max_qvalue')
 
     def get_q(self, state):
+        """Args:
+                state (tuple): a state
+
+            Returns:
+                (QValue): a representation of Q-Value(self.state, action), for all actions
+                    in self.actions
+        """
         if (state in self.q):
             return self.q[state]
         else:
@@ -159,9 +207,16 @@ class LearningAgent(Agent):
         self.last_reward = reward
 
     def generate_state(self):
+        """Returns a tuple that represents the current state."""
         return (self.inputs['light'], self.inputs['oncoming'], self.inputs['right'], self.inputs['left'], self.next_waypoint)
 
-    def final_ten_trials_scores(self):
+    def final_ten_percent_trials_scores(self):
+        """Generates metrics for the last 10% trips processed by the agent.
+
+            Returns:
+                (float): the average reward per action.
+                (flat): proportion of successful trips over all trips.
+        """
         rewards = self.trial_result_keeper.average_rewards
         goal_reached = self.trial_result_keeper.goal_reached
 
@@ -176,6 +231,14 @@ class LearningAgent(Agent):
 
 
 def output_evaluate(average_rewards):
+    """Generates a report of all average rewards per action for the 90% first
+    trips and the last 10% ones.
+
+        Args:
+            average_rewards (:obj:`list` of float): a list of average reward per
+                action in each trip.
+
+    """
     limit = int(len(average_rewards) * 0.9)
     first_runs = []
     for i in range(0, limit):
@@ -190,14 +253,13 @@ def output_evaluate(average_rewards):
     print last_runs
 
 
-def pretty_print_goal_reached(x):
-    if (x):
-        return '+'
-    else:
-        return '.'
-
-
 def compare_best(agent):
+    """Compare all the actions the agent would select given a state against the
+    actions that the method perfect_agent_choice chooses.
+
+        Args:
+            agent (LearningAgent): the agent
+    """
     total_actions = 0
     equal_actions = 0
     total_weighted_actions = 0
@@ -223,6 +285,18 @@ def compare_best(agent):
 
 
 def perfect_agent_choice(light, oncoming, right, left, next_waypoint):
+    """Defines the optimal choice for a smartcab given the attributes that represent a state
+
+        Args:
+            light (str): green or red
+            oncoming (str): None, left, forward, right
+            left (str): None, left, forward, right
+            right (str): None, left, forward, right
+            next_waypoint (str): left, forward, right
+
+        Returns:
+            (str): the best action
+    """
     if (light == 'green'):
         if (next_waypoint == 'left'):
             if (oncoming is None or oncoming == 'left'):
@@ -241,7 +315,16 @@ def perfect_agent_choice(light, oncoming, right, left, next_waypoint):
             return None
 
 
+def pretty_print_goal_reached(x):
+    """Auxiliary function for output_goal_reached. Returns '+' if x is True, '-' otherwise."""
+    if (x):
+        return '+'
+    else:
+        return '.'
+
+
 def output_goal_reached(goal_reached):
+    """Returns a list of '+' and '.', where '+' represents a trip where the goal was reached and '.' otherwise."""
     print 'Goal reached (. no, + yes): {}'.format(''.join(pretty_print_goal_reached(x) for x in goal_reached))
 
 
@@ -298,6 +381,7 @@ def error_print(str):
 
 
 def grid_search():
+    """Prints the score for combinations of parameters."""
     limit = 10
     for alpha in np.arange(0.1, 1.1, 0.1):
         for gamma in np.arange(0.0, 1.1, 0.1):
@@ -306,7 +390,7 @@ def grid_search():
                 avg_successful_runs = .0
                 for _ in range(0, limit):
                     agent = run_no_display(3, alpha, gamma, epsilon)
-                    (score, successful_runs) = agent.final_ten_trials_scores()
+                    (score, successful_runs) = agent.final_ten_percent_trials_scores()
                     avg_score = avg_score + score
                     avg_successful_runs = avg_successful_runs + successful_runs
                 avg_score = avg_score / float(limit)
